@@ -39,7 +39,7 @@ tasks.withType<DokkaTask>().configureEach {
             moduleName.set("Spotify API Wrapper")
             sourceLink {
                 localDirectory.set(file("src/main/kotlin"))
-                remoteUrl.set(URL("https://github.com/Kotlin/dokka/tree/master/examples/gradle/dokka-gradle-example/src/main/kotlin"))
+                remoteUrl.set(URL("https://github.com/DQMME/spotifyapiwrapper/tree/master/src/main/kotlin"))
                 remoteLineSuffix.set("#L")
             }
         }
