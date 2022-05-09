@@ -1,5 +1,9 @@
 package de.dqmme.spotifyapiwrapper.dataclass
 
+/**
+ * Every Scope that can be used to authorize
+ */
+
 class SpotifyScope {
     companion object {
         //Images
