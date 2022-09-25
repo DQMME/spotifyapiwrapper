@@ -22,6 +22,7 @@ import io.ktor.client.request.parameter
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.HttpResponse
+import io.ktor.client.statement.bodyAsText
 import io.ktor.http.HttpHeaders
 import io.ktor.http.Parameters
 import io.ktor.serialization.kotlinx.json.json
@@ -31,12 +32,12 @@ import kotlinx.serialization.json.Json
  * Where all the magic happens
  */
 
-class SpotifyClient private constructor(
-    private var clientId: String?,
-    private var clientSecret: String?,
-    private var redirectUri: String?,
-    private var bearerToken: String?,
-    private var refreshToken: String?
+class SpotifyClient(
+    var clientId: String? = null,
+    var clientSecret: String? = null,
+    var redirectUri: String? = null,
+    var bearerToken: String? = null,
+    var refreshToken: String? = null
 ) {
     private val httpClient: HttpClient = HttpClient(CIO) {
         install(ContentNegotiation) {
@@ -58,24 +59,14 @@ class SpotifyClient private constructor(
      */
 
     fun generateAuthUrl(scopes: Set<String>): String {
-        val scope = scopeString(scopes)
+        checkNotNull(clientId)
+        checkNotNull(redirectUri)
 
         return "https://accounts.spotify.com/authorize" +
                 "?response_type=code" +
                 "&client_id=$clientId" +
-                "&scope=$scope" +
+                "&scope=${scopes.joinToString(" ")}" +
                 "&redirect_uri=$redirectUri"
-    }
-
-    /**
-     * Generates a string with all given scopes to use it as parameter
-     * @param[scopes] The list of scopes that should be used
-     * @see de.dqmme.spotifyapiwrapper.dataclass.SpotifyScope
-     * @return[String] The string which contains all the scopes
-     */
-
-    private fun scopeString(scopes: Set<String>): String {
-        return scopes.joinToString(" ")
     }
 
     /**
@@ -97,13 +88,11 @@ class SpotifyClient private constructor(
                 append("redirect_uri", redirectUri!!)
                 append("grant_type", "authorization_code")
             }))
-        }.parseOrNull<AccessTokenResponse>()
+        }.bodyOrNull<AccessTokenResponse>()
 
         if (response != null) {
-            with(response) {
-                this@SpotifyClient.bearerToken = this.accessToken
-                this@SpotifyClient.refreshToken = this.refreshToken
-            }
+            this@SpotifyClient.bearerToken = response.accessToken
+            this@SpotifyClient.refreshToken = response.refreshToken
         }
 
         return response
@@ -129,12 +118,10 @@ class SpotifyClient private constructor(
                 append("client_id", clientId!!)
                 append("client_secret", clientSecret!!)
             }))
-        }.parseOrNull<RefreshTokenResponse>()
+        }.bodyOrNull<RefreshTokenResponse>()
 
         if (response != null) {
-            with(response) {
-                this@SpotifyClient.bearerToken = this.accessToken
-            }
+            this@SpotifyClient.bearerToken = response.accessToken
         }
 
         return response
@@ -155,7 +142,7 @@ class SpotifyClient private constructor(
             parameter("ids", albumIds.joinToString(","))
 
             header(HttpHeaders.Authorization, "Bearer $bearerToken")
-        }.parseOrNull<SpotifyAlbumResponse>()
+        }.bodyOrNull<SpotifyAlbumResponse>()
 
         return response?.albums ?: listOf()
     }
@@ -176,7 +163,7 @@ class SpotifyClient private constructor(
             parameter("offset", "$offset")
 
             header(HttpHeaders.Authorization, "Bearer $bearerToken")
-        }.parseOrNull<SpotifyTracks>()
+        }.bodyOrNull<SpotifyTracks>()
 
         return response
     }
@@ -206,7 +193,7 @@ class SpotifyClient private constructor(
             parameter("offset", "$offset")
 
             header(HttpHeaders.Authorization, "Bearer $bearerToken")
-        }.parseOrNull<SpotifyArtistAlbums>()
+        }.bodyOrNull<SpotifyArtistAlbums>()
 
         return response
     }
@@ -217,14 +204,14 @@ class SpotifyClient private constructor(
      * @return[List] The fetched artists. Null if failed
      */
 
-    suspend fun getRelatedArtists(artistId: String): List<SpotifyRelatedArtist> {
+    suspend fun getRelatedArtists(artistId: String): List<SpotifyRelatedArtist>? {
         checkNotNull(bearerToken)
 
         val response = httpClient.get("$endpoint/artists/$artistId/related-artists") {
             header(HttpHeaders.Authorization, "Bearer $bearerToken")
-        }.parseOrNull<SpotifyRelatedArtistResponse>()
+        }.bodyOrNull<SpotifyRelatedArtistResponse>()
 
-        return response?.artists ?: listOf()
+        return response?.artists
     }
 
     /**
@@ -241,16 +228,14 @@ class SpotifyClient private constructor(
             parameter("market", market)
 
             header(HttpHeaders.Authorization, "Bearer $bearerToken")
-        }
+        }.bodyOrNull<SpotifyTopTracksResponse>()
 
-        println(response.body<SpotifyTopTracksResponse>())
-
-        return response.parseOrNull<SpotifyTopTracksResponse>()?.tracks
+        return response?.tracks
     }
 
-    private suspend inline fun <reified Any> HttpResponse.parseOrNull(): Any? {
+    private suspend inline fun <reified T> HttpResponse.bodyOrNull(): T? {
         return try {
-            body<Any>()
+            body<T>()
         } catch (_: Exception) {
             null
         }
@@ -263,86 +248,14 @@ class SpotifyClient private constructor(
     fun close() {
         httpClient.close()
     }
+}
 
-    /**
-     * Creates a new spotify client object
-     */
-
-    class Builder {
-        private var clientId: String? = null
-        private var clientSecret: String? = null
-        private var redirectUri: String? = null
-        private var bearerToken: String? = null
-        private var refreshToken: String? = null
-
-        /**
-         * Sets the client id which should be used
-         * @param[clientId] The client id
-         * @return[Builder] The instance
-         */
-
-        fun withClientId(clientId: String): Builder {
-            this.clientId = clientId
-            return this
-        }
-
-        /**
-         * Sets the client secret which should be used
-         * @param[clientSecret] The client secret
-         * @return[Builder] The instance
-         */
-
-        fun withClientSecret(clientSecret: String): Builder {
-            this.clientSecret = clientSecret
-            return this
-        }
-
-        /**
-         * Sets the redirect uri which should be used
-         * @param[redirectUri] The redirect uri
-         * @return[Builder] The instance
-         */
-
-        fun withRedirectUri(redirectUri: String): Builder {
-            this.redirectUri = redirectUri
-            return this
-        }
-
-        /**
-         * Sets the bearer token which should be used
-         * @param[bearerToken] The bearer token
-         * @return[Builder] The instance
-         */
-
-        fun withBearerToken(bearerToken: String): Builder {
-            this.bearerToken = bearerToken
-            return this
-        }
-
-        /**
-         * Sets the refresh token which should be used
-         * @param[refreshToken] The refresh token
-         * @return[Builder] The instance
-         */
-
-        fun withRefreshToken(refreshToken: String): Builder {
-            this.refreshToken = refreshToken
-            return this
-        }
-
-        /**
-         * Builds the client
-         * @return[SpotifyClient] The spotify client instance
-         */
-
-        fun build(): SpotifyClient {
-            return SpotifyClient(
-                clientId = clientId,
-                clientSecret = clientSecret,
-                redirectUri = redirectUri,
-                bearerToken = bearerToken,
-                refreshToken = refreshToken
-            )
-        }
-    }
+/**
+* Inline client builder
+* @param[builder] The Spotify Client Builder as Unit
+* */
+inline fun SpotifyClient(
+    builder: SpotifyClient.() -> Unit
+): SpotifyClient {
+    return SpotifyClient().apply(builder)
 }
