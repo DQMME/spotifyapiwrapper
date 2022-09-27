@@ -11,7 +11,7 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class SpotifyImage(
-    val height: Int,
-    val width: Int,
+    val height: Int? = null,
+    val width: Int? = null,
     val url: String
 )

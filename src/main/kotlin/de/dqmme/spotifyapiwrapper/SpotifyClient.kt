@@ -9,12 +9,14 @@ import de.dqmme.spotifyapiwrapper.dataclass.SpotifyArtistAlbums
 import de.dqmme.spotifyapiwrapper.dataclass.SpotifyArtistsResponse
 import de.dqmme.spotifyapiwrapper.dataclass.SpotifyIncludeGroup
 import de.dqmme.spotifyapiwrapper.dataclass.SpotifyPlayback
+import de.dqmme.spotifyapiwrapper.dataclass.SpotifyPlaylistResponse
 import de.dqmme.spotifyapiwrapper.dataclass.SpotifyQueueResponse
 import de.dqmme.spotifyapiwrapper.dataclass.SpotifyRelatedArtist
 import de.dqmme.spotifyapiwrapper.dataclass.SpotifyRelatedArtistResponse
 import de.dqmme.spotifyapiwrapper.dataclass.SpotifyTopTracksResponse
 import de.dqmme.spotifyapiwrapper.dataclass.SpotifyTrack
 import de.dqmme.spotifyapiwrapper.dataclass.SpotifyTracks
+import de.dqmme.spotifyapiwrapper.dataclass.SpotifyUser
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.engine.cio.CIO
@@ -26,7 +28,6 @@ import io.ktor.client.request.header
 import io.ktor.client.request.parameter
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
-import io.ktor.client.statement.HttpResponse
 import io.ktor.http.HttpHeaders
 import io.ktor.http.Parameters
 import io.ktor.http.isSuccess
@@ -80,7 +81,7 @@ class SpotifyClient(
      * @return[AccessTokenResponse] The response containing the tokens
      */
 
-    suspend fun requestAccessToken(code: String): AccessTokenResponse? {
+    suspend fun requestAccessToken(code: String): AccessTokenResponse {
         checkNotNull(clientId)
         checkNotNull(clientSecret)
         checkNotNull(redirectUri)
@@ -93,12 +94,10 @@ class SpotifyClient(
                 append("redirect_uri", redirectUri!!)
                 append("grant_type", "authorization_code")
             }))
-        }.bodyOrNull<AccessTokenResponse>()
+        }.body<AccessTokenResponse>()
 
-        if (response != null) {
-            this@SpotifyClient.bearerToken = response.accessToken
-            this@SpotifyClient.refreshToken = response.refreshToken
-        }
+        this@SpotifyClient.bearerToken = response.accessToken
+        this@SpotifyClient.refreshToken = response.refreshToken
 
         return response
     }
@@ -109,7 +108,7 @@ class SpotifyClient(
      * @return[RefreshTokenResponse] The response containing the refreshed token
      */
 
-    suspend fun refreshToken(refreshToken: String? = null): RefreshTokenResponse? {
+    suspend fun refreshToken(refreshToken: String? = null): RefreshTokenResponse {
         val newRefreshToken = refreshToken ?: this.refreshToken
 
         checkNotNull(newRefreshToken)
@@ -123,11 +122,9 @@ class SpotifyClient(
                 append("client_id", clientId!!)
                 append("client_secret", clientSecret!!)
             }))
-        }.bodyOrNull<RefreshTokenResponse>()
+        }.body<RefreshTokenResponse>()
 
-        if (response != null) {
-            this@SpotifyClient.bearerToken = response.accessToken
-        }
+        this@SpotifyClient.bearerToken = response.accessToken
 
         return response
     }
@@ -143,13 +140,11 @@ class SpotifyClient(
 
         if (albumIds.isEmpty()) return listOf()
 
-        val response = httpClient.get("$endpoint/albums") {
+        return httpClient.get("$endpoint/albums") {
             parameter("ids", albumIds.joinToString(","))
 
             header(HttpHeaders.Authorization, "Bearer $bearerToken")
-        }.bodyOrNull<SpotifyAlbumResponse>()
-
-        return response?.albums ?: listOf()
+        }.body<SpotifyAlbumResponse>().albums
     }
 
     /**
@@ -157,20 +152,18 @@ class SpotifyClient(
      * @param[albumId] The album id that should be used
      * @param[limit] How many songs should be fetched. Can't be greater than 50. Default 50
      * @param[offset] Where the song list should start.
-     * @return[SpotifyTracks] The fetched tracks. Null if failed
+     * @return[SpotifyTracks] The fetched tracks.
      */
 
-    suspend fun getAlbumTracks(albumId: String, limit: Int = 50, offset: Int = 0): SpotifyTracks? {
+    suspend fun getAlbumTracks(albumId: String, limit: Int = 50, offset: Int = 0): SpotifyTracks {
         checkNotNull(bearerToken)
 
-        val response = httpClient.get("$endpoint/albums/$albumId/tracks") {
+        return httpClient.get("$endpoint/albums/$albumId/tracks") {
             parameter("limit", "$limit")
             parameter("offset", "$offset")
 
             header(HttpHeaders.Authorization, "Bearer $bearerToken")
-        }.bodyOrNull<SpotifyTracks>()
-
-        return response
+        }.body()
     }
 
     /**
@@ -180,7 +173,7 @@ class SpotifyClient(
      * @param[limit] How many albums should be fetched. Can't be greater than 50. Default 50
      * @param[offset] Where the album list should start.
      * @see de.dqmme.spotifyapiwrapper.dataclass.SpotifyIncludeGroup
-     * @return[SpotifyArtistAlbums] The fetched albums. Null if failed
+     * @return[SpotifyArtistAlbums] The fetched albums.
      */
 
     suspend fun getArtistAlbums(
@@ -188,70 +181,62 @@ class SpotifyClient(
         includeGroups: Set<String> = setOf(SpotifyIncludeGroup.ALBUM),
         limit: Int = 50,
         offset: Int = 0
-    ): SpotifyArtistAlbums? {
+    ): SpotifyArtistAlbums {
         checkNotNull(bearerToken)
 
-        val response = httpClient.get("$endpoint/artists/$artistId/albums") {
+        return httpClient.get("$endpoint/artists/$artistId/albums") {
             parameter("include_groups", includeGroups.joinToString(","))
 
             parameter("limit", "$limit")
             parameter("offset", "$offset")
 
             header(HttpHeaders.Authorization, "Bearer $bearerToken")
-        }.bodyOrNull<SpotifyArtistAlbums>()
-
-        return response
+        }.body()
     }
 
     /**
      * Fetches related artists
      * @param[artistId] The artist id that should be used
-     * @return[List] The fetched artists. Null if failed
+     * @return[List] The fetched artists.
      */
 
-    suspend fun getRelatedArtists(artistId: String): List<SpotifyRelatedArtist>? {
+    suspend fun getRelatedArtists(artistId: String): List<SpotifyRelatedArtist> {
         checkNotNull(bearerToken)
 
-        val response = httpClient.get("$endpoint/artists/$artistId/related-artists") {
+        return httpClient.get("$endpoint/artists/$artistId/related-artists") {
             header(HttpHeaders.Authorization, "Bearer $bearerToken")
-        }.bodyOrNull<SpotifyRelatedArtistResponse>()
-
-        return response?.artists
+        }.body<SpotifyRelatedArtistResponse>().artists
     }
 
     /**
      * Fetches artist's top tracks
      * @param[artistId] The artist id that should be used
      * @param[market] The market that should be used. Default US
-     * @return[List] The fetched tracks. Null if failed
+     * @return[List] The fetched tracks.
      */
 
-    suspend fun getArtistTopTracks(artistId: String, market: String = "US"): List<SpotifyTrack>? {
+    suspend fun getArtistTopTracks(artistId: String, market: String = "US"): List<SpotifyTrack> {
         checkNotNull(bearerToken)
 
-        val response = httpClient.get("$endpoint/artists/$artistId/top-tracks") {
+        return httpClient.get("$endpoint/artists/$artistId/top-tracks") {
             parameter("market", market)
 
             header(HttpHeaders.Authorization, "Bearer $bearerToken")
-        }.bodyOrNull<SpotifyTopTracksResponse>()
-
-        return response?.tracks
+        }.body<SpotifyTopTracksResponse>().tracks
     }
 
     /**
      * Fetches artist's top tracks
      * @param[artistIds] A set of artist ids.
-     * @return[List] The fetched artists. Null if failed
+     * @return[List] The fetched artists.
      */
 
-    suspend fun getArtists(artistIds: Set<String>): List<SpotifyArtist>? {
+    suspend fun getArtists(artistIds: Set<String>): List<SpotifyArtist> {
         checkNotNull(bearerToken)
 
-        val response = httpClient.get("$endpoint/artists/${artistIds.joinToString(",")}") {
+        return httpClient.get("$endpoint/artists/${artistIds.joinToString(",")}") {
             header(HttpHeaders.Authorization, "Bearer $bearerToken")
-        }.bodyOrNull<SpotifyArtistsResponse>()
-
-        return response?.artists
+        }.body<SpotifyArtistsResponse>().artists
     }
 
     /**
@@ -291,14 +276,12 @@ class SpotifyClient(
      * @return[SpotifyQueueResponse] The queue
      * */
 
-    suspend fun getQueue(): SpotifyQueueResponse? {
+    suspend fun getQueue(): SpotifyQueueResponse {
         checkNotNull(bearerToken)
 
-        val response = httpClient.get("$endpoint/me/player/queue") {
+        return httpClient.get("$endpoint/me/player/queue") {
             header(HttpHeaders.Authorization, "Bearer $bearerToken")
-        }.bodyOrNull<SpotifyQueueResponse>()
-
-        return response
+        }.body()
     }
 
     /**
@@ -307,24 +290,64 @@ class SpotifyClient(
      * @return[SpotifyPlayback] The playback
      * */
 
-    suspend fun getPlayback(market: String = "US"): SpotifyPlayback? {
+    suspend fun getPlayback(market: String = "US"): SpotifyPlayback {
         checkNotNull(bearerToken)
 
-        val response = httpClient.get("$endpoint/me/player") {
+        return httpClient.get("$endpoint/me/player") {
             parameter("market", market)
 
             header(HttpHeaders.Authorization, "Bearer $bearerToken")
-        }.bodyOrNull<SpotifyPlayback>()
-
-        return response
+        }.body<SpotifyPlayback>()
     }
 
-    private suspend inline fun <reified T> HttpResponse.bodyOrNull(): T? {
-        return try {
-            body<T>()
-        } catch (_: Exception) {
-            null
-        }
+    /**
+     * Gets the own user
+     * @return[SpotifyUser] The user
+     * */
+
+    suspend fun getSelfUser(): SpotifyUser {
+        checkNotNull(bearerToken)
+
+        return httpClient.get("$endpoint/me") {
+            header(HttpHeaders.Authorization, "Bearer $bearerToken")
+        }.body()
+    }
+
+    /**
+     * Gets own playlists
+     * @param[limit] The limit of numbers
+     * @param[offset] Where to start in the list
+     * @return[de.dqmme.spotifyapiwrapper.dataclass.SpotifyPlaylistResponse] The playlists response
+     * */
+
+    suspend fun getOwnPlaylists(limit: Int, offset: Int): SpotifyPlaylistResponse {
+        checkNotNull(bearerToken)
+
+        return httpClient.get("$endpoint/me/playlists") {
+            parameter("limit", limit)
+            parameter("offset", offset)
+
+            header(HttpHeaders.Authorization, "Bearer $bearerToken")
+        }.body()
+    }
+
+    /**
+     * Adds an item to a playlist
+     * @param[playlistId] The id of the playlist
+     * @param[position] At which position
+     * @param[uris] A set of song uris to be added
+     * @return[Boolean] Whether the request succeeded or not
+     */
+
+    suspend fun addItemsToPlaylist(playlistId: String, position: Int, uris: Set<String>): Boolean {
+        checkNotNull(bearerToken)
+
+        return httpClient.post("$endpoint/playlists/$playlistId") {
+            parameter("position", position)
+            parameter("uris", uris.joinToString(","))
+
+            header(HttpHeaders.Authorization, "Bearer $bearerToken")
+        }.status.isSuccess()
     }
 
     /**
