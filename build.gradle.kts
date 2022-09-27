@@ -13,7 +13,7 @@ plugins {
 }
 
 group = "de.dqmme"
-version = "1.0-SNAPSHOT"
+version = "1.0.1"
 
 repositories {
     mavenCentral()
@@ -52,7 +52,7 @@ publishing {
         create<MavenPublication>("maven") {
             groupId = "de.dqmme"
             artifactId = "spotifyapiwrapper"
-            version = "1.0.0"
+            version = "1.0.1"
 
             from(components["java"])
         }
