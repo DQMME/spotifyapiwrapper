@@ -1,14 +1,15 @@
-import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 import org.jetbrains.dokka.gradle.DokkaTask
+import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 import java.net.URL
 
 val ktorVersion: String by project
 
 plugins {
-    kotlin("jvm") version "1.7.0-Beta"
-    kotlin("plugin.serialization") version "1.7.0-Beta"
+    kotlin("jvm") version "1.7.10"
+    kotlin("plugin.serialization") version "1.7.10"
     application
-    id("org.jetbrains.dokka") version "1.6.21"
+    `maven-publish`
+    id("org.jetbrains.dokka") version "1.7.10"
 }
 
 group = "de.dqmme"
@@ -19,10 +20,10 @@ repositories {
 }
 
 dependencies {
-    implementation("io.ktor:ktor-client-core:$ktorVersion")
-    implementation("io.ktor:ktor-client-cio:$ktorVersion")
-    implementation("io.ktor:ktor-client-content-negotiation:$ktorVersion")
-    implementation("io.ktor:ktor-serialization-kotlinx-json:$ktorVersion")
+    implementation("io.ktor", "ktor-client-core", ktorVersion)
+    implementation("io.ktor", "ktor-client-cio", ktorVersion)
+    implementation("io.ktor", "ktor-client-content-negotiation", ktorVersion)
+    implementation("io.ktor", "ktor-serialization-kotlinx-json", ktorVersion)
 }
 
 tasks.withType<KotlinCompile> {
@@ -42,6 +43,18 @@ tasks.withType<DokkaTask>().configureEach {
                 remoteUrl.set(URL("https://github.com/DQMME/spotifyapiwrapper/tree/master/src/main/kotlin"))
                 remoteLineSuffix.set("#L")
             }
+        }
+    }
+}
+
+publishing {
+    publications {
+        create<MavenPublication>("maven") {
+            groupId = "de.dqmme"
+            artifactId = "spotifyapiwrapper"
+            version = "1.0.0"
+
+            from(components["java"])
         }
     }
 }
