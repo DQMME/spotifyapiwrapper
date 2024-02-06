@@ -17,6 +17,7 @@ import de.dqmme.spotifyapiwrapper.dataclass.SpotifyTopTracksResponse
 import de.dqmme.spotifyapiwrapper.dataclass.SpotifyTrack
 import de.dqmme.spotifyapiwrapper.dataclass.SpotifyTracks
 import de.dqmme.spotifyapiwrapper.dataclass.SpotifyUser
+import de.dqmme.spotifyapiwrapper.util.findParameterValue
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.engine.cio.CIO
@@ -33,6 +34,7 @@ import io.ktor.http.Parameters
 import io.ktor.http.isSuccess
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.serialization.json.Json
+import java.net.URL
 
 /**
  * Where all the magic happens
@@ -73,6 +75,16 @@ class SpotifyClient(
                 "&client_id=$clientId" +
                 "&scope=${scopes.joinToString(" ")}" +
                 "&redirect_uri=$redirectUri"
+    }
+
+    /**
+     * Extractes the code from the given callback url
+     * @param[callbackUrl] The callback url
+     * @return[String] The extracted code or null
+     */
+
+    fun extractAuthCode(callbackUrl: String): String? {
+        return URL(callbackUrl).findParameterValue("code")
     }
 
     /**
