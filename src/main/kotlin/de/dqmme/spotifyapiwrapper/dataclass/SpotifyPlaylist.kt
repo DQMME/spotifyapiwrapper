@@ -6,11 +6,11 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class SpotifyPlaylist(
     val collaborative: Boolean,
-    val description: String,
+    val description: String? = null,
     @SerialName("external_urls") val externalUrls: SpotifyExternalUrls,
     val href: String,
     val id: String,
-    val images: List<SpotifyImage>,
+    val images: List<SpotifyImage>? = null,
     val name: String,
     val owner: SpotifyUser
 )

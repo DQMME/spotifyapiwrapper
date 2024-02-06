@@ -332,7 +332,7 @@ class SpotifyClient(
      * @return[de.dqmme.spotifyapiwrapper.dataclass.SpotifyPlaylistResponse] The playlists response
      * */
 
-    suspend fun getOwnPlaylists(limit: Int, offset: Int): SpotifyPlaylistResponse {
+    suspend fun getOwnPlaylists(limit: Int = 20, offset: Int = 0): SpotifyPlaylistResponse {
         checkNotNull(bearerToken)
 
         return httpClient.get("$endpoint/me/playlists") {
@@ -351,11 +351,14 @@ class SpotifyClient(
      * @return[Boolean] Whether the request succeeded or not
      */
 
-    suspend fun addItemsToPlaylist(playlistId: String, position: Int, uris: Set<String>): Boolean {
+    suspend fun addItemsToPlaylist(playlistId: String, uris: Set<String>, position: Int? = null): Boolean {
         checkNotNull(bearerToken)
 
         return httpClient.post("$endpoint/playlists/$playlistId") {
-            parameter("position", position)
+            if(position != null) {
+                parameter("position", position)
+            }
+
             parameter("uris", uris.joinToString(","))
 
             header(HttpHeaders.Authorization, "Bearer $bearerToken")
